@@ -1,0 +1,2 @@
+- [project-architecture](memory/project-architecture.md) — 求职助手项目整体架构定义，技术栈、数据模型、页面结构等核心决策
+- [design-system](design-system/job-assistant/MASTER.md) — 基于 UI/UX Pro Max Skill 生成的完整设计系统（色彩/字体/间距/组件/暗色模式）

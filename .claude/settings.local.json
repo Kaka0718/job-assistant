@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.skills.sh)",
+      "WebSearch",
+      "Bash(npx skills *)",
+      "Bash(python *)",
+      "Bash(python3 -V)",
+      "Bash(py -3 --version)",
+      "Bash(/c/Users/user/AppData/Local/Microsoft/WindowsApps/python3 -V)",
+      "Bash(gh --version)",
+      "Bash(git init *)",
+      "Bash(git branch *)",
+      "Bash(git add *)",
+      "Bash(git commit -m '🎉 初始化项目：求职助手 *)",
+      "Bash(git config *)"
+    ]
+  }
+}
