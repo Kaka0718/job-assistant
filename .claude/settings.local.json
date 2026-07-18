@@ -13,7 +13,11 @@
       "Bash(git branch *)",
       "Bash(git add *)",
       "Bash(git commit -m '🎉 初始化项目：求职助手 *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(curl *)",
+      "Bash(git commit -m '📝 v1.2 架构更新：优化投递模型、Prompt 和 Dashboard *)"
     ]
   }
 }

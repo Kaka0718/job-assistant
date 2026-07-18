@@ -1,6 +1,6 @@
 # 求职助手 — 完整项目架构文档
 
-> **版本：** v1.1  
+> **版本：** v1.2  
 > **最后更新：** 2026-07-18  
 > **技术栈：** Tauri 2.0 + React 19 + TypeScript 5.8 + Vite 6 + Tailwind CSS v4
 > **设计系统：** ui-ux-pro-max Skill (Flat Design + Micro-interactions)
@@ -393,6 +393,8 @@ type PositionCategory = '测试' | '开发' | '运营' | '产品' | '设计' | '
 
 ### 4.4 投递记录 (Application)
 
+投递记录是**自动生成**的快照，无需用户手动维护状态。每次生成打招呼时自动记录一条，用户只需标记"是否有进展"。
+
 **文件路径：** `data/applications/{日期}_{公司名}_{岗位}.md`
 
 ```markdown
@@ -401,13 +403,10 @@ id: app_001
 positionId: pos_001
 company: 字节跳动
 positionTitle: 测试工程师
-jobUrl: "https://www.zhipin.com/job_detail/xxx.html"
-status: applied
 created: 2026-07-18
-updated: 2026-07-18
-salary: "15K-25K"
-location: 北京
-source: Boss直聘
+matchScore: 85
+hasProgress: false
+keywords: ["自动化测试", "性能测试"]
 ---
 
 ## JD 原文
@@ -416,18 +415,7 @@ source: Boss直聘
 
 ## 生成的打招呼
 
-> 您好，我对贵公司的测试工程师岗位很感兴趣。我有 3 年测试经验...
-
-## 深度分析
-
-- **匹配度**：85%
-- **岗位亮点**：自动化测试、接口测试
-- **建议补充**：CI/CD 经验
-
-## 沟通记录
-
-- 2026-07-18 14:00 已发送打招呼
-- 2026-07-19 10:00 HR 已读，等待回复
+> 您好，看到贵司在招测试工程师，我对自动化测试方向有比较丰富的经验...
 ```
 
 **TypeScript 类型：**
@@ -438,36 +426,16 @@ interface Application {
   positionId: string        // 关联岗位档案
   company: string
   positionTitle: string
-  jobUrl: string
-  status: ApplicationStatus
   created: string
-  updated: string
-  salary: string
-  location: string
-  source: string
-  jdContent: string
-  greeting: string
-  analysis: string
-  timeline: TimelineEntry[]
-}
-
-type ApplicationStatus =
-  | 'draft'        // 草稿/待投递
-  | 'applied'      // 已投递
-  | 'read'         // 已读
-  | 'chatting'     // 沟通中
-  | 'interview'    // 面试中
-  | 'offer'        // 已拿 Offer
-  | 'rejected'     // 不合适
-  | 'archived'     // 已归档
-
-interface TimelineEntry {
-  date: string
-  time: string
-  action: string
-  note?: string
+  matchScore: number         // AI 生成的匹配度评分
+  hasProgress: boolean       // 用户手动标记"有进展"
+  keywords: string[]         // 打招呼中嵌入的 JD 关键词
+  jdContent: string          // JD 原文
+  greeting: string           // 生成的打招呼文案
 }
 ```
+
+> **设计原则：** 记录是副产品，不是任务。用户只需在仪表盘看到统计趋势，零维护成本。
 
 ### 4.5 设置 (Settings)
 
@@ -547,10 +515,18 @@ interface Settings {
 #### Dashboard（首页/仪表盘）
 | 状态 | 行为 |
 |------|------|
-| 加载中 | Skeleton 骨架屏，3 个统计卡片 + 列表占位 |
-| 空数据 | 欢迎引导页，提示"添加第一个岗位档案" |
-| 有数据 | 统计概览（档案数/投递数/面试数/Offer数）+ 最近投递列表 |
+| 加载中 | Skeleton 骨架屏，统计卡片 + 最近投递列表占位 |
+| 空数据 | 欢迎引导页，提示"完善个人档案，开始求职之旅" |
+| 有数据 | 统计看板（今日投递/本周投递/平均匹配度/有进展数）+ 最近投递列表 + 匹配度趋势 |
 | 错误 | 错误提示卡片 + 重试按钮 |
+
+**统计卡片：**
+```
+┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+│  📤 今日  │  │  📊 本周  │  │  🎯 平均  │  │  🔥 有进展 │
+│   5 份    │  │  18 份    │  │  82%     │  │   2 个    │
+└──────────┘  └──────────┘  └──────────┘  └──────────┘
+```
 
 #### PositionListPage（岗位档案列表）
 | 状态 | 行为 |
@@ -766,6 +742,8 @@ interface AnthropicRequest {
 
 ### 7.3 核心 Prompt 设计
 
+> **核心策略：** 打招呼必须嵌入 JD 中的 1-2 个具体关键词，让 HR 一眼看出候选人认真看了 JD，非群发模板。
+
 **System Prompt：**
 
 ```
@@ -786,12 +764,16 @@ interface AnthropicRequest {
   }
 }
 
-## 打招呼文案要求
+## 打招呼文案要求（严格遵循）
 - 语气礼貌、专业
 - 突出个人与岗位的匹配点
 - 控制 50-100 字
 - 不要包含联系方式
 - 不要过度承诺
+- ⚠️ 强制要求：必须在文案中自然融入 1-2 个来自 JD 的具体关键词
+  （如"自动化测试体系"、"性能调优"、"用户增长策略" —— 不是泛泛的"测试"、"开发"）
+  这些关键词应嵌入到描述个人经验的句子中，而非生硬列举
+- 必须包含公司名称，自然融入开头
 
 ## 深度分析要求
 - matchScore：0-100 的匹配度评分
@@ -814,6 +796,8 @@ interface AnthropicRequest {
 
 ## 招聘岗位 JD
 {jd 内容}
+
+请确保打招呼中自然融入公司名称和 JD 中的 1-2 个具体岗位关键词。
 ```
 
 ### 7.4 AI 调用封装 (`src/lib/ai.ts`)
@@ -1389,8 +1373,9 @@ npm run tauri build
 |------|------|
 | 岗位档案 CRUD | ✅ P0 |
 | 个人档案管理 | ✅ P0 |
-| AI 打招呼生成（粘贴文字） | ✅ P0 |
-| 投递记录追踪 | ✅ P0 |
+| AI 打招呼生成（强制嵌入 JD 关键词） | ✅ P0 |
+| 投递记录自动快照（零维护） | ✅ P0 |
+| 仪表盘统计看板（今日/本周/平均匹配度/有进展） | ✅ P0 |
 | 设置管理（API Key 配置） | ✅ P0 |
 
 ### 阶段二：体验优化
@@ -1398,8 +1383,9 @@ npm run tauri build
 | 功能 | 说明 |
 |------|------|
 | 流式输出 | 生成打招呼时逐字显示，减少等待焦虑 |
-| 打招呼历史 | 同一个岗位可生成多个版本，切换选择 |
-| 打招呼模板 | 用户可保存自定义模板 |
+| 关键词手动勾选 | 用户从 JD 中手动勾选 2-3 个关键词，AI 围绕这些点生成 |
+| 打招呼历史版本 | 同一次投递可生成多个版本，切换选择 |
+| 匹配度趋势图 | 在仪表盘展示各岗位方向的匹配度变化趋势 |
 | 数据导出 | 导出为 CSV/Excel 投递报告 |
 | 自动深色模式 | 跟随系统主题 |
 
