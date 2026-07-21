@@ -17,7 +17,19 @@
       "Bash(git remote *)",
       "Bash(git push *)",
       "Bash(curl *)",
-      "Bash(git commit -m '📝 v1.2 架构更新：优化投递模型、Prompt 和 Dashboard *)"
+      "Bash(git commit -m '📝 v1.2 架构更新：优化投递模型、Prompt 和 Dashboard *)",
+      "Bash(npm --version)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(npm install *)",
+      "Bash(npx shadcn@latest *)",
+      "Bash(npm list *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(cargo build *)",
+      "Bash(npm run *)",
+      "Bash(cargo clippy *)",
+      "Bash(git commit *)"
     ]
   }
 }
