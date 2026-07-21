@@ -8,7 +8,7 @@ use chrono::Local;
 
 /// 获取个人档案文件路径
 fn get_profile_path() -> PathBuf {
-    PathBuf::from("../data/profiles/profile.md")
+    crate::get_data_dir().join("profiles/profile.md")
 }
 
 /// Frontmatter 中间结构体
@@ -66,9 +66,9 @@ pub fn get_profile() -> Result<Option<Profile>, AppError> {
         expect_salary: front_data.expect_salary,
         years_of_experience: front_data.years_of_experience,
         skills: front_data.skills,
-        work_experience,
-        projects,
-        education,
+        work_experience: if work_experience.is_empty() { None } else { Some(work_experience) },
+        projects: if projects.is_empty() { None } else { Some(projects) },
+        education: if education.is_empty() { None } else { Some(education) },
     }))
 }
 
@@ -143,14 +143,20 @@ pub fn save_profile(input: SaveProfileInput) -> Result<Profile, AppError> {
     };
 
     let mut body_parts = Vec::new();
-    if !profile.work_experience.is_empty() {
-        body_parts.push(format!("## 工作经历\n\n{}", profile.work_experience));
+    if let Some(ref exp) = profile.work_experience {
+        if !exp.is_empty() {
+            body_parts.push(format!("## 工作经历\n\n{}", exp));
+        }
     }
-    if !profile.projects.is_empty() {
-        body_parts.push(format!("## 项目经历\n\n{}", profile.projects));
+    if let Some(ref proj) = profile.projects {
+        if !proj.is_empty() {
+            body_parts.push(format!("## 项目经历\n\n{}", proj));
+        }
     }
-    if !profile.education.is_empty() {
-        body_parts.push(format!("## 教育背景\n\n{}", profile.education));
+    if let Some(ref edu) = profile.education {
+        if !edu.is_empty() {
+            body_parts.push(format!("## 教育背景\n\n{}", edu));
+        }
     }
     let body = body_parts.join("\n\n");
 
@@ -181,9 +187,9 @@ mod tests {
             expect_salary: "15K-20K".to_string(),
             years_of_experience: 3,
             skills: vec!["功能测试".to_string(), "自动化测试".to_string()],
-            work_experience: "3 年测试经验".to_string(),
-            projects: "自动化测试框架搭建".to_string(),
-            education: "本科 计算机科学".to_string(),
+            work_experience: Some("3 年测试经验".to_string()),
+            projects: Some("自动化测试框架搭建".to_string()),
+            education: Some("本科 计算机科学".to_string()),
         };
 
         let profile = save_profile(input).unwrap();

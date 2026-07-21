@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// AI 设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AISettings {
     pub provider: String,
     pub api_key: String,
@@ -26,6 +27,7 @@ impl Default for AISettings {
 
 /// 应用设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub theme: String,
     pub language: String,
@@ -44,6 +46,7 @@ impl Default for AppSettings {
 
 /// 全局设置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub ai: AISettings,
     pub app: AppSettings,

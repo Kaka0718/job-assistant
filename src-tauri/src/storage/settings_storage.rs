@@ -5,7 +5,7 @@ use crate::utils::error::AppError;
 
 /// 获取设置文件路径（JSON 文件）
 fn get_settings_path() -> PathBuf {
-    PathBuf::from("../data/settings.json")
+    crate::get_data_dir().join("settings.json")
 }
 
 /// 获取默认设置

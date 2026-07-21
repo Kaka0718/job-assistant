@@ -56,6 +56,7 @@ impl std::fmt::Display for PositionStatus {
 
 /// 岗位档案
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Position {
     pub id: String,
     pub title: String,
@@ -65,27 +66,29 @@ pub struct Position {
     pub status: PositionStatus,
     pub skills: Vec<String>,
     pub tags: Vec<String>,
-    pub notes: String,
+    pub notes: Option<String>,
     /// Markdown 正文 — 个人匹配分析
-    pub analysis: String,
+    pub analysis: Option<String>,
     /// Markdown 正文 — 常见面试问题
-    pub interview_questions: String,
+    pub interview_questions: Option<String>,
 }
 
 /// 创建岗位档案输入
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreatePositionInput {
     pub title: String,
     pub category: PositionCategory,
     pub skills: Vec<String>,
     pub tags: Vec<String>,
-    pub notes: String,
-    pub analysis: String,
-    pub interview_questions: String,
+    pub notes: Option<String>,
+    pub analysis: Option<String>,
+    pub interview_questions: Option<String>,
 }
 
 /// 更新岗位档案输入
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdatePositionInput {
     pub title: Option<String>,
     pub category: Option<PositionCategory>,

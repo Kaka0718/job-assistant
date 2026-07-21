@@ -4,32 +4,41 @@ pub mod storage;
 pub mod utils;
 
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use storage::file_ops;
+use tauri::Manager;
 
-/// 应用数据目录路径
-/// 在 Tauri 中通过 app_data_dir 获取，开发时使用项目根目录下的 data/
-pub fn get_data_dir() -> PathBuf {
-    PathBuf::from("../data")
+/// 全局数据目录（由 Tauri setup 初始化，测试时使用默认路径）
+static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// 设置数据目录（在 Tauri setup 中调用）
+pub fn init_data_dir(path: PathBuf) {
+    let _ = DATA_DIR.set(path);
 }
 
-/// 初始化数据目录
-fn init_data_dirs() {
-    let base = get_data_dir();
-    let dirs = ["profiles", "positions", "applications"];
-    for dir in &dirs {
-        let path = base.join(dir);
-        if let Err(e) = file_ops::ensure_dir(&path) {
-            eprintln!("Warning: Failed to create data dir {:?}: {}", path, e);
-        }
-    }
+/// 获取数据目录，未初始化时使用开发环境默认路径
+pub fn get_data_dir() -> &'static PathBuf {
+    DATA_DIR.get_or_init(|| PathBuf::from("../data"))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    init_data_dirs();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            // 使用 Tauri 标准的应用数据目录
+            if let Ok(app_data) = app.path().app_data_dir() {
+                init_data_dir(app_data.clone());
+                // 确保子目录存在
+                for dir in &["profiles", "positions", "applications"] {
+                    let path = app_data.join(dir);
+                    if let Err(e) = file_ops::ensure_dir(&path) {
+                        eprintln!("Warning: Failed to create data dir {:?}: {}", path, e);
+                    }
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::position::list_positions,
             commands::position::get_position,

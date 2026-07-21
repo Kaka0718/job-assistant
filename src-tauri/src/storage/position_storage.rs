@@ -10,7 +10,7 @@ use chrono::Local;
 
 /// 获取岗位档案存储目录
 fn get_positions_dir() -> PathBuf {
-    PathBuf::from("../data/positions")
+    crate::get_data_dir().join("positions")
 }
 
 #[allow(dead_code)]
@@ -75,8 +75,8 @@ fn get_position_from_file(path: &std::path::Path) -> Result<Option<Position>, Ap
         skills: front_data.skills,
         tags: front_data.tags,
         notes: front_data.notes,
-        analysis: body.clone(),
-        interview_questions: String::new(), // 通过正文分割处理
+        analysis: Some(body.clone()),
+        interview_questions: Some(String::new()), // 通过正文分割处理
     }))
 }
 
@@ -91,7 +91,8 @@ struct PositionFrontmatter {
     status: PositionStatus,
     skills: Vec<String>,
     tags: Vec<String>,
-    notes: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    notes: Option<String>,
 }
 
 /// 按 ID 获取岗位档案
@@ -143,12 +144,14 @@ pub fn create_position(input: CreatePositionInput) -> Result<Position, AppError>
     };
 
     // 构建正文（analysis + interview_questions）
-    let body = if position.interview_questions.is_empty() {
-        position.analysis.clone()
+    let analysis_text = position.analysis.clone().unwrap_or_default();
+    let interview_text = position.interview_questions.clone().unwrap_or_default();
+    let body = if interview_text.is_empty() {
+        analysis_text
     } else {
         format!(
             "{}\n\n## 常见面试问题\n\n{}",
-            position.analysis, position.interview_questions
+            analysis_text, interview_text
         )
     };
 
@@ -175,11 +178,11 @@ pub fn update_position(id: &str, input: UpdatePositionInput) -> Result<Position,
         status: input.status.unwrap_or(existing.status),
         skills: input.skills.unwrap_or(existing.skills),
         tags: input.tags.unwrap_or(existing.tags),
-        notes: input.notes.unwrap_or(existing.notes),
-        analysis: input.analysis.unwrap_or(existing.analysis),
+        notes: input.notes.or(existing.notes),
+        analysis: input.analysis.or(existing.analysis),
         interview_questions: input
             .interview_questions
-            .unwrap_or(existing.interview_questions),
+            .or(existing.interview_questions),
     };
 
     // 删除旧文件
@@ -198,12 +201,13 @@ pub fn update_position(id: &str, input: UpdatePositionInput) -> Result<Position,
         notes: updated.notes.clone(),
     };
 
-    let body = if updated.interview_questions.is_empty() {
-        updated.analysis.clone()
+    let body = if updated.interview_questions.clone().unwrap_or_default().is_empty() {
+        updated.analysis.clone().unwrap_or_default()
     } else {
         format!(
             "{}\n\n## 常见面试问题\n\n{}",
-            updated.analysis, updated.interview_questions
+            updated.analysis.clone().unwrap_or_default(),
+            updated.interview_questions.clone().unwrap_or_default()
         )
     };
 
@@ -257,9 +261,9 @@ mod tests {
             category: PositionCategory::Testing,
             skills: vec!["功能测试".to_string(), "自动化测试".to_string()],
             tags: vec!["软件测试".to_string()],
-            notes: "偏向自动化方向".to_string(),
-            analysis: "## 个人匹配分析\n\n3 年测试经验".to_string(),
-            interview_questions: "如何设计测试用例？".to_string(),
+            notes: Some("偏向自动化方向".to_string()),
+            analysis: Some("## 个人匹配分析\n\n3 年测试经验".to_string()),
+            interview_questions: Some("如何设计测试用例？".to_string()),
         };
 
         let pos = create_position(input).unwrap();
@@ -279,9 +283,9 @@ mod tests {
             category: PositionCategory::Development,
             skills: vec!["Rust".to_string()],
             tags: vec![],
-            notes: String::new(),
-            analysis: String::new(),
-            interview_questions: String::new(),
+            notes: None,
+            analysis: None,
+            interview_questions: None,
         };
 
         let pos = create_position(input).unwrap();
