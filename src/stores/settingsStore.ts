@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { Settings } from "@/types/settings";
+import { testConnection as testAIConnection } from "@/lib/ai";
 
 const defaultSettings: Settings = {
   ai: {
@@ -75,7 +76,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     set({ testing: true, testResult: null });
     try {
       const { settings } = get();
-      const success = await invoke<boolean>("test_ai_connection", { data: settings });
+      const success = await testAIConnection(settings);
       set({
         testing: false,
         testResult: {
