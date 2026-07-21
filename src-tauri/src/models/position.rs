@@ -1,5 +1,60 @@
 use serde::{Deserialize, Serialize};
 
+/// 岗位分类
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PositionCategory {
+    #[serde(rename = "测试")]
+    Testing,
+    #[serde(rename = "开发")]
+    Development,
+    #[serde(rename = "运营")]
+    Operations,
+    #[serde(rename = "产品")]
+    Product,
+    #[serde(rename = "设计")]
+    Design,
+    #[serde(rename = "运维")]
+    DevOps,
+    #[serde(rename = "数据")]
+    Data,
+    #[serde(rename = "其他")]
+    Other,
+}
+
+impl std::fmt::Display for PositionCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PositionCategory::Testing => write!(f, "测试"),
+            PositionCategory::Development => write!(f, "开发"),
+            PositionCategory::Operations => write!(f, "运营"),
+            PositionCategory::Product => write!(f, "产品"),
+            PositionCategory::Design => write!(f, "设计"),
+            PositionCategory::DevOps => write!(f, "运维"),
+            PositionCategory::Data => write!(f, "数据"),
+            PositionCategory::Other => write!(f, "其他"),
+        }
+    }
+}
+
+/// 岗位状态
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PositionStatus {
+    Active,
+    Archived,
+}
+
+impl std::fmt::Display for PositionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PositionStatus::Active => write!(f, "active"),
+            PositionStatus::Archived => write!(f, "archived"),
+        }
+    }
+}
+
+/// 岗位档案
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Position {
@@ -12,38 +67,13 @@ pub struct Position {
     pub skills: Vec<String>,
     pub tags: Vec<String>,
     pub notes: Option<String>,
+    /// Markdown 正文 — 个人匹配分析
     pub analysis: Option<String>,
+    /// Markdown 正文 — 常见面试问题
     pub interview_questions: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PositionCategory {
-    #[serde(rename = "测试")]
-    Test,
-    #[serde(rename = "开发")]
-    Dev,
-    #[serde(rename = "运营")]
-    Ops,
-    #[serde(rename = "产品")]
-    Product,
-    #[serde(rename = "设计")]
-    Design,
-    #[serde(rename = "运维")]
-    DevOps,
-    #[serde(rename = "数据")]
-    Data,
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PositionStatus {
-    Active,
-    Archived,
-}
-
+/// 创建岗位档案输入
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePositionInput {
@@ -56,6 +86,7 @@ pub struct CreatePositionInput {
     pub interview_questions: Option<String>,
 }
 
+/// 更新岗位档案输入
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePositionInput {

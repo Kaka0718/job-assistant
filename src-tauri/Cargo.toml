@@ -2,12 +2,12 @@
 name = "job-assistant"
 version = "0.1.0"
 description = "求职助手 - 桌面端求职辅助工具"
-authors = ["you"]
+authors = ["wps0718"]
 edition = "2021"
 
 [lib]
 name = "job_assistant_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
