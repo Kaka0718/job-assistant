@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, Send } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import Header from "@/components/layout/Header";
+import { useApplicationStore } from "@/stores/applicationStore";
 
 const statusColorMap: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
@@ -30,18 +31,14 @@ const statusLabelMap: Record<string, string> = {
   archived: "已归档",
 };
 
-const mockApplications: Array<{
-  id: string;
-  company: string;
-  positionTitle: string;
-  created: string;
-  status: string;
-}> = [];
-
 export default function ApplicationListPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const isLoading = false;
+  const { applications, loading, fetchApplications } = useApplicationStore();
+
+  useEffect(() => {
+    fetchApplications();
+  }, [fetchApplications]);
 
   return (
     <div className="flex h-full flex-col">
@@ -60,39 +57,46 @@ export default function ApplicationListPage() {
         </div>
 
         {/* Content */}
-        {isLoading ? (
+        {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-16 rounded-lg" />
             ))}
           </div>
-        ) : mockApplications.length === 0 ? (
+        ) : applications.length === 0 ? (
           <EmptyState
-            icon={SendIcon}
+            icon={Send}
             title="还没有投递记录"
             description="生成打招呼后会自动记录投递，也可以手动添加"
           />
         ) : (
           <div className="space-y-3">
-            {mockApplications.map((app) => (
-              <Card
-                key={app.id}
-                className="cursor-pointer transition-colors hover:bg-surface-hover"
-                onClick={() => navigate(`/applications/${app.id}`)}
-              >
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{app.company}</p>
-                    <p className="text-xs text-text-muted">
-                      {app.positionTitle} · {app.created}
-                    </p>
-                  </div>
-                  <Badge className={statusColorMap[app.status] || ""}>
-                    {statusLabelMap[app.status] || app.status}
-                  </Badge>
-                </CardContent>
-              </Card>
-            ))}
+            {applications
+              .filter(
+                (app) =>
+                  !search ||
+                  app.company.toLowerCase().includes(search.toLowerCase()) ||
+                  app.positionTitle.toLowerCase().includes(search.toLowerCase()),
+              )
+              .map((app) => (
+                <Card
+                  key={app.id}
+                  className="cursor-pointer transition-colors hover:bg-surface-hover"
+                  onClick={() => navigate(`/applications/${app.id}`)}
+                >
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{app.company}</p>
+                      <p className="text-xs text-text-muted">
+                        {app.positionTitle} · {app.created}
+                      </p>
+                    </div>
+                    <Badge className={statusColorMap[app.status] || ""}>
+                      {statusLabelMap[app.status] || app.status}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              ))}
           </div>
         )}
       </div>
@@ -100,5 +104,3 @@ export default function ApplicationListPage() {
   );
 }
 
-import { Send } from "lucide-react";
-const SendIcon = Send;

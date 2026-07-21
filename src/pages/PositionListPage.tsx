@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,19 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import Header from "@/components/layout/Header";
-
-const mockPositions: Array<{
-  id: string;
-  title: string;
-  category: string;
-  skills: string[];
-  status: string;
-}> = [];
+import { usePositionStore } from "@/stores/positionStore";
 
 export default function PositionListPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const isLoading = false;
+  const { positions, loading, fetchPositions } = usePositionStore();
+
+  useEffect(() => {
+    fetchPositions();
+  }, [fetchPositions]);
 
   return (
     <div className="flex h-full flex-col">
@@ -48,15 +45,15 @@ export default function PositionListPage() {
         </div>
 
         {/* Content */}
-        {isLoading ? (
+        {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-40 rounded-lg" />
             ))}
           </div>
-        ) : mockPositions.length === 0 ? (
+        ) : positions.length === 0 && !search ? (
           <EmptyState
-            icon={BriefcaseIcon}
+            icon={Briefcase}
             title="还没有岗位档案"
             description="创建你的第一个岗位档案，开始求职之旅"
             actionLabel="新建档案"
@@ -64,32 +61,39 @@ export default function PositionListPage() {
           />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {mockPositions.map((position) => (
-              <Card
-                key={position.id}
-                className="cursor-pointer transition-colors hover:bg-surface-hover"
-                onClick={() => navigate(`/positions/${position.id}`)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">{position.title}</CardTitle>
-                    <Badge variant={position.status === "active" ? "default" : "secondary"}>
-                      {position.status === "active" ? "进行中" : "已归档"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="mb-2 text-xs text-text-muted">{position.category}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {position.skills.map((skill) => (
-                      <Badge key={skill} variant="outline" className="text-xs">
-                        {skill}
+            {positions
+              .filter(
+                (p) =>
+                  !search ||
+                  p.title.toLowerCase().includes(search.toLowerCase()) ||
+                  p.category.toLowerCase().includes(search.toLowerCase()),
+              )
+              .map((position) => (
+                <Card
+                  key={position.id}
+                  className="cursor-pointer transition-colors hover:bg-surface-hover"
+                  onClick={() => navigate(`/positions/${position.id}`)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">{position.title}</CardTitle>
+                      <Badge variant={position.status === "active" ? "default" : "secondary"}>
+                        {position.status === "active" ? "进行中" : "已归档"}
                       </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="mb-2 text-xs text-text-muted">{position.category}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {position.skills.map((skill) => (
+                        <Badge key={skill} variant="outline" className="text-xs">
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
           </div>
         )}
       </div>
@@ -97,5 +101,3 @@ export default function PositionListPage() {
   );
 }
 
-import { Briefcase } from "lucide-react";
-const BriefcaseIcon = Briefcase;
