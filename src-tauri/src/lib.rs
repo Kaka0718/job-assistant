@@ -40,6 +40,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::dashboard::get_dashboard_stats,
             commands::position::list_positions,
             commands::position::get_position,
             commands::position::create_position,
