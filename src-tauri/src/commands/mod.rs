@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod dashboard;
 pub mod position;
 pub mod application;
