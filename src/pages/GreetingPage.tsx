@@ -33,6 +33,7 @@ export default function GreetingPage() {
     setSelectedPosition,
     setSelectedKeywords,
     generateGreeting,
+    switchVersion,
   } = useGreetingStore();
 
   const { profile, fetchProfile } = useProfileStore();
@@ -40,7 +41,6 @@ export default function GreetingPage() {
   const {
     versions,
     currentVersionId,
-    switchVersion,
     deleteVersion,
   } = useGreetingVersionStore();
 
