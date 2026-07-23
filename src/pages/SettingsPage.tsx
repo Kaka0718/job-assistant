@@ -13,8 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Header from "@/components/layout/Header";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, XCircle, Loader2, Download, Upload, Database } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { save, open } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 import type { ThemeMode } from "@/types/settings";
 
 export default function SettingsPage() {
@@ -33,6 +37,10 @@ export default function SettingsPage() {
 
   const { setTheme } = useTheme();
   const [showApiKey, setShowApiKey] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreConfirm, setRestoreConfirm] = useState(false);
+  const [restoreFilePath, setRestoreFilePath] = useState<string | null>(null);
 
   // Load settings on mount
   useEffect(() => {
@@ -81,6 +89,56 @@ export default function SettingsPage() {
   // Handle test connection
   const handleTestConnection = async () => {
     await testConnection();
+  };
+
+  // Handle backup export
+  const handleExportBackup = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: "ZIP Backup", extensions: ["zip"] }],
+        defaultPath: `job-assistant-backup-${new Date().toISOString().slice(0, 10)}.zip`,
+      });
+      if (!filePath) return;
+
+      setBackingUp(true);
+      await invoke("export_backup", { path: filePath });
+      toast.success("备份已导出");
+    } catch (err) {
+      toast.error(`备份失败：${err}`);
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
+  // Handle backup import
+  const handleSelectRestore = async () => {
+    try {
+      const filePath = await open({
+        filters: [{ name: "ZIP Backup", extensions: ["zip"] }],
+        multiple: false,
+      });
+      if (!filePath) return;
+
+      setRestoreFilePath(filePath as string);
+      setRestoreConfirm(true);
+    } catch (err) {
+      toast.error(`选择文件失败：${err}`);
+    }
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!restoreFilePath) return;
+    setRestoreConfirm(false);
+    setRestoring(true);
+    try {
+      await invoke("import_backup", { path: restoreFilePath });
+      toast.success("数据已恢复，请重新加载页面查看变更");
+    } catch (err) {
+      toast.error(`恢复失败：${err}`);
+    } finally {
+      setRestoring(false);
+      setRestoreFilePath(null);
+    }
   };
 
   return (
@@ -280,7 +338,71 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Data Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Database size={16} className="text-primary" />
+              数据管理
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              导出备份将把全部数据（岗位档案、投递记录、个人档案）打包为 ZIP 文件。
+              导入备份会覆盖当前所有数据。
+            </p>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={handleExportBackup}
+                disabled={backingUp}
+              >
+                {backingUp ? (
+                  <>
+                    <Loader2 size={14} className="mr-1 animate-spin" />
+                    备份中...
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} className="mr-1" />
+                    导出备份
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleSelectRestore}
+                disabled={restoring}
+              >
+                {restoring ? (
+                  <>
+                    <Loader2 size={14} className="mr-1 animate-spin" />
+                    恢复中...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} className="mr-1" />
+                    导入备份
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Restore Confirm Dialog */}
+      <ConfirmDialog
+        open={restoreConfirm}
+        onOpenChange={(open) => { if (!open) setRestoreConfirm(false); }}
+        title="确认恢复数据"
+        description="恢复备份将覆盖当前所有数据（岗位档案、投递记录、个人档案），此操作不可撤销。建议先导出当前数据作为备份。"
+        confirmLabel="确认恢复"
+        variant="danger"
+        onConfirm={handleConfirmRestore}
+        onCancel={() => setRestoreFilePath(null)}
+      />
     </div>
   );
 }

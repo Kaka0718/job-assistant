@@ -11,12 +11,29 @@ import {
   AlertCircle,
   RefreshCw,
   ArrowRight,
+  BarChart3,
 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { useApplicationStore } from "@/stores/applicationStore";
 import { useProfileStore } from "@/stores/profileStore";
 import { formatRelative } from "@/lib/date";
-import { isToday, isWithinInterval, startOfWeek, endOfWeek } from "date-fns";
+import { isToday, isWithinInterval, startOfWeek, endOfWeek, subWeeks, format } from "date-fns";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Cell,
+  LineChart,
+  Line,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Legend,
+} from "recharts";
+import type { PieLabelRenderProps } from "recharts";
 
 const statusColorMap: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
@@ -38,6 +55,31 @@ const statusLabelMap: Record<string, string> = {
   offer: "Offer",
   rejected: "拒绝",
   archived: "已归档",
+};
+
+// Chart color palette
+const CHART_COLORS = {
+  score: "#2563EB",
+  trend: "#059669",
+  draft: "#94A3B8",
+  applied: "#2563EB",
+  read: "#0284C7",
+  chatting: "#7C3AED",
+  interview: "#D97706",
+  offer: "#059669",
+  rejected: "#DC2626",
+  archived: "#CBD5E1",
+};
+
+const STATUS_CHART_COLORS: Record<string, string> = {
+  draft: CHART_COLORS.draft,
+  applied: CHART_COLORS.applied,
+  read: CHART_COLORS.read,
+  chatting: CHART_COLORS.chatting,
+  interview: CHART_COLORS.interview,
+  offer: CHART_COLORS.offer,
+  rejected: CHART_COLORS.rejected,
+  archived: CHART_COLORS.archived,
 };
 
 export default function Dashboard() {
@@ -90,6 +132,61 @@ export default function Dashboard() {
     )
     .slice(0, 5);
 
+  // ── Chart Data ──
+
+  // 1. Match score distribution
+  const scoreBuckets = [0, 0, 0, 0, 0];
+  applications.forEach((app) => {
+    if (app.matchScore != null) {
+      const s = app.matchScore;
+      if (s <= 20) scoreBuckets[0]++;
+      else if (s <= 40) scoreBuckets[1]++;
+      else if (s <= 60) scoreBuckets[2]++;
+      else if (s <= 80) scoreBuckets[3]++;
+      else scoreBuckets[4]++;
+    }
+  });
+  const scoreData = [
+    { name: "0-20", value: scoreBuckets[0], color: "#DC2626" },
+    { name: "21-40", value: scoreBuckets[1], color: "#D97706" },
+    { name: "41-60", value: scoreBuckets[2], color: "#94A3B8" },
+    { name: "61-80", value: scoreBuckets[3], color: "#3B82F6" },
+    { name: "81-100", value: scoreBuckets[4], color: "#059669" },
+  ];
+  const hasScoreData = scoreData.some((d) => d.value > 0);
+
+  // 2. Weekly trend (last 8 weeks)
+  const weeks: { label: string; start: Date; end: Date }[] = [];
+  for (let i = 7; i >= 0; i--) {
+    const wStart = startOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
+    const wEnd = endOfWeek(subWeeks(now, i), { weekStartsOn: 1 });
+    weeks.push({
+      label: format(wStart, "MM/dd"),
+      start: wStart,
+      end: wEnd,
+    });
+  }
+  const trendData = weeks.map((w) => ({
+    week: w.label,
+    count: applications.filter(
+      (app) =>
+        new Date(app.created) >= w.start &&
+        new Date(app.created) <= w.end
+    ).length,
+  }));
+  const hasTrendData = trendData.some((d) => d.count > 0);
+
+  // 3. Status distribution
+  const statusData = [
+    "draft", "applied", "read", "chatting",
+    "interview", "offer", "rejected", "archived",
+  ].map((status) => ({
+    name: statusLabelMap[status] || status,
+    value: applications.filter((app) => app.status === status).length,
+    color: STATUS_CHART_COLORS[status] || "#94A3B8",
+  }));
+  const hasStatusData = statusData.some((d) => d.value > 0);
+
   const stats = [
     {
       label: "今日投递",
@@ -126,6 +223,10 @@ export default function Dashboard() {
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-28 rounded-lg" />
             ))}
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Skeleton className="h-64 rounded-lg" />
+            <Skeleton className="h-64 rounded-lg" />
           </div>
           <Skeleton className="h-64 rounded-lg" />
         </div>
@@ -237,55 +338,192 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          /* Recent Applications */
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">最近投递</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-primary"
-                  onClick={() => navigate("/applications")}
-                >
-                  查看全部
-                  <ArrowRight size={14} className="ml-1" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {recentApplications.map((app) => (
-                <div
-                  key={app.id}
-                  className="flex cursor-pointer items-center justify-between rounded-lg p-2.5 transition-colors hover:bg-surface-hover"
-                  onClick={() => navigate(`/applications/${app.id}`)}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-text-primary">
-                      {app.company}
-                    </p>
-                    <p className="truncate text-xs text-text-muted">
-                      {app.positionTitle} · {formatRelative(app.created)}
-                    </p>
+          <>
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {/* Match Score Distribution */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <BarChart3 size={16} className="text-primary" />
+                    匹配度分布
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {hasScoreData ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={scoreData}>
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fontSize: 12 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            allowDecimals={false}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <Tooltip />
+                          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                            {scoreData.map((entry, index) => (
+                              <Cell key={index} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex h-32 items-center justify-center">
+                      <p className="text-sm text-text-muted">暂无匹配度数据</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Weekly Trend */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <TrendingUp size={16} className="text-emerald-600" />
+                    每周投递趋势
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {hasTrendData ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                          <XAxis
+                            dataKey="week"
+                            tick={{ fontSize: 12 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            allowDecimals={false}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <Tooltip />
+                          <Line
+                            type="monotone"
+                            dataKey="count"
+                            stroke={CHART_COLORS.trend}
+                            strokeWidth={2}
+                            dot={{ r: 4, fill: CHART_COLORS.trend }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex h-32 items-center justify-center">
+                      <p className="text-sm text-text-muted">暂无投递数据</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Status Distribution Donut Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Target size={16} className="text-violet-600" />
+                  状态分布
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {hasStatusData ? (
+                  <div className="flex h-64 items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={statusData.filter((d) => d.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ name, percent }: PieLabelRenderProps) =>
+                            `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                          }
+                        >
+                          {statusData
+                            .filter((d) => d.value > 0)
+                            .map((entry, index) => (
+                              <Cell key={index} fill={entry.color} />
+                            ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div className="ml-3 flex items-center gap-2">
-                    {app.matchScore != null && (
-                      <span className="text-xs text-text-muted">
-                        {app.matchScore}%
-                      </span>
-                    )}
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        statusColorMap[app.status] || ""
-                      }`}
-                    >
-                      {statusLabelMap[app.status] || app.status}
-                    </span>
+                ) : (
+                  <div className="flex h-32 items-center justify-center">
+                    <p className="text-sm text-text-muted">暂无投递数据</p>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Applications */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">最近投递</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-primary"
+                    onClick={() => navigate("/applications")}
+                  >
+                    查看全部
+                    <ArrowRight size={14} className="ml-1" />
+                  </Button>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {recentApplications.map((app) => (
+                  <div
+                    key={app.id}
+                    className="flex cursor-pointer items-center justify-between rounded-lg p-2.5 transition-colors hover:bg-surface-hover"
+                    onClick={() => navigate(`/applications/${app.id}`)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-text-primary">
+                        {app.company}
+                      </p>
+                      <p className="truncate text-xs text-text-muted">
+                        {app.positionTitle} · {formatRelative(app.created)}
+                      </p>
+                    </div>
+                    <div className="ml-3 flex items-center gap-2">
+                      {app.matchScore != null && (
+                        <span className="text-xs text-text-muted">
+                          {app.matchScore}%
+                        </span>
+                      )}
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs ${
+                          statusColorMap[app.status] || ""
+                        }`}
+                      >
+                        {statusLabelMap[app.status] || app.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
     </div>

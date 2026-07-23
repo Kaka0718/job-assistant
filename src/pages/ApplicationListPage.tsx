@@ -20,6 +20,18 @@ import { useApplicationStore } from "@/stores/applicationStore";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/date";
 import type { ApplicationStatus } from "@/types/application";
+import type { Application } from "@/types/application";
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 
 const PAGE_SIZE = 20;
 
@@ -67,6 +79,132 @@ const kanbanColumnColors: Record<string, string> = {
   archived: "border-t-slate-300",
 };
 
+/* ─── Draggable Card ─── */
+function KanbanCard({
+  app,
+  isDragging,
+}: {
+  app: Application;
+  isDragging?: boolean;
+}) {
+  const navigate = useNavigate();
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: `card-${app.id}`,
+    data: { app, fromStatus: app.status },
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        opacity: isDragging ? 0.5 : 1,
+      }
+    : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="cursor-grab active:cursor-grabbing"
+    >
+      <Card
+        className="transition-shadow hover:shadow-md active:scale-[0.98]"
+        onClick={() => !isDragging && navigate(`/applications/${app.id}`)}
+      >
+        <CardContent className="p-3">
+          <p className="truncate text-sm font-medium text-text-primary">
+            {app.company}
+          </p>
+          <p className="truncate text-xs text-text-muted">
+            {app.positionTitle}
+          </p>
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-xs text-text-muted">
+              {formatDate(app.created)}
+            </span>
+            {app.matchScore != null && (
+              <span className="text-xs text-text-muted">
+                {app.matchScore}%
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* ─── Droppable Column ─── */
+function KanbanColumn({
+  status,
+  label,
+  apps,
+}: {
+  status: string;
+  label: string;
+  apps: Application[];
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `column-${status}`,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex min-w-56 flex-col rounded-lg border border-border bg-surface transition-colors ${
+        apps.length === 0 ? "opacity-50" : ""
+      } ${isOver ? "bg-primary-bg ring-2 ring-primary" : ""}`}
+    >
+      {/* Column Header */}
+      <div
+        className={`flex items-center justify-between border-b border-border px-3 py-2.5 ${
+          kanbanColumnColors[status]
+        } border-t-2`}
+      >
+        <span className="text-sm font-medium text-text-primary">{label}</span>
+        <span className="rounded-full bg-surface-hover px-2 py-0.5 text-xs text-text-muted">
+          {apps.length}
+        </span>
+      </div>
+
+      {/* Column Cards */}
+      <div className="flex-1 space-y-2 overflow-y-auto p-2">
+        {apps.length === 0 ? (
+          <div className="flex items-center justify-center py-8">
+            <p className="text-xs text-text-muted">暂无记录</p>
+          </div>
+        ) : (
+          apps.map((app) => (
+            <div key={app.id}>
+              <KanbanCard app={app} />
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── DragOverlay Content ─── */
+function DragOverlayCard({ app }: { app: Application }) {
+  return (
+    <div className="rotate-3 opacity-90 shadow-lg">
+      <Card>
+        <CardContent className="p-3">
+          <p className="truncate text-sm font-medium text-text-primary">
+            {app.company}
+          </p>
+          <p className="truncate text-xs text-text-muted">
+            {app.positionTitle}
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* ─── Main Page ─── */
 export default function ApplicationListPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -74,7 +212,14 @@ export default function ApplicationListPage() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+  const [activeDragApp, setActiveDragApp] = useState<Application | null>(null);
   const { applications, loading, fetchApplications, updateStatus } = useApplicationStore();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
 
   useEffect(() => {
     fetchApplications();
@@ -128,6 +273,49 @@ export default function ApplicationListPage() {
           app.positionTitle.toLowerCase().includes(search.toLowerCase()))
     ),
   }));
+
+  // DnD handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    const id = String(event.active.id);
+    if (id.startsWith("card-")) {
+      const app = event.active.data.current?.app as Application;
+      setActiveDragApp(app);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveDragApp(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    if (!activeId.startsWith("card-")) return;
+
+    const app = active.data.current?.app as Application;
+    const fromStatus = active.data.current?.fromStatus as string;
+
+    // Determine target status from droppable column
+    let targetStatus: string | null = null;
+    if (overId.startsWith("column-")) {
+      targetStatus = overId.replace("column-", "");
+    } else if (overId.startsWith("card-")) {
+      // Dropped on another card - find its column
+      const overApp = over.data.current?.app as Application;
+      targetStatus = overApp?.status || null;
+    }
+
+    if (!targetStatus || targetStatus === fromStatus) return;
+
+    // Update status
+    try {
+      await updateStatus(app.id, targetStatus as ApplicationStatus);
+      toast.success("状态已更新");
+    } catch (err) {
+      toast.error(`状态更新失败：${err}`);
+    }
+  };
 
   // Loading state
   if (loading) {
@@ -194,7 +382,10 @@ export default function ApplicationListPage() {
         {/* Search & Filter */}
         <div className="flex items-center gap-4">
           <div className="relative w-full max-w-sm">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+            />
             <Input
               placeholder="搜索公司或岗位..."
               value={search}
@@ -254,7 +445,10 @@ export default function ApplicationListPage() {
                           <Select
                             value={app.status}
                             onValueChange={(value: string) =>
-                              handleStatusChange(app.id, value as ApplicationStatus)
+                              handleStatusChange(
+                                app.id,
+                                value as ApplicationStatus
+                              )
                             }
                             disabled={statusUpdating === app.id}
                           >
@@ -293,7 +487,8 @@ export default function ApplicationListPage() {
                         setDisplayCount((prev) => prev + PAGE_SIZE)
                       }
                     >
-                      加载更多（{filteredApplications.length - displayCount} 条）
+                      加载更多（
+                      {filteredApplications.length - displayCount} 条）
                     </Button>
                   </div>
                 )}
@@ -301,103 +496,29 @@ export default function ApplicationListPage() {
             )}
           </>
         ) : (
-          /* Kanban View */
-          <div className="flex h-full gap-4 overflow-x-auto pb-4">
-            {kanbanColumns.map((col) => (
-              <div
-                key={col.status}
-                className={`flex min-w-56 flex-col rounded-lg border border-border bg-surface ${
-                  col.apps.length === 0 ? "opacity-50" : ""
-                }`}
-              >
-                {/* Column Header */}
-                <div
-                  className={`flex items-center justify-between border-b border-border px-3 py-2.5 ${
-                    kanbanColumnColors[col.status]
-                  } border-t-2`}
-                >
-                  <span className="text-sm font-medium text-text-primary">
-                    {col.label}
-                  </span>
-                  <span className="rounded-full bg-surface-hover px-2 py-0.5 text-xs text-text-muted">
-                    {col.apps.length}
-                  </span>
-                </div>
+          /* Kanban View with Drag & Drop */
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="flex h-full gap-4 overflow-x-auto pb-4">
+              {kanbanColumns.map((col) => (
+                <KanbanColumn
+                  key={col.status}
+                  status={col.status}
+                  label={col.label}
+                  apps={col.apps}
+                />
+              ))}
+            </div>
 
-                {/* Column Cards */}
-                <div className="flex-1 space-y-2 overflow-y-auto p-2">
-                  {col.apps.length === 0 ? (
-                    <div className="flex items-center justify-center py-8">
-                      <p className="text-xs text-text-muted">暂无记录</p>
-                    </div>
-                  ) : (
-                    col.apps.map((app) => (
-                      <Card
-                        key={app.id}
-                        className="cursor-pointer transition-colors hover:bg-surface-hover"
-                        onClick={() => navigate(`/applications/${app.id}`)}
-                      >
-                        <CardContent className="p-3">
-                          <p className="truncate text-sm font-medium text-text-primary">
-                            {app.company}
-                          </p>
-                          <p className="truncate text-xs text-text-muted">
-                            {app.positionTitle}
-                          </p>
-                          <div className="mt-2 flex items-center justify-between">
-                            <span className="text-xs text-text-muted">
-                              {formatDate(app.created)}
-                            </span>
-                            {app.matchScore != null && (
-                              <span className="text-xs text-text-muted">
-                                {app.matchScore}%
-                              </span>
-                            )}
-                          </div>
-                          <div
-                            className="mt-1.5"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Select
-                              value={app.status}
-                              onValueChange={(value: string) =>
-                                handleStatusChange(
-                                  app.id,
-                                  value as ApplicationStatus
-                                )
-                              }
-                              disabled={statusUpdating === app.id}
-                            >
-                              <SelectTrigger className="h-6 w-full border-0 p-0 shadow-none">
-                                <SelectValue>
-                                  <span
-                                    className={`rounded-full px-2 py-0.5 text-xs ${
-                                      statusColorMap[app.status] || ""
-                                    }`}
-                                  >
-                                    {statusLabelMap[app.status] || app.status}
-                                  </span>
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STATUS_ORDER.map((s) => (
-                                  <SelectItem key={s} value={s}>
-                                    <span className={statusColorMap[s]}>
-                                      {statusLabelMap[s]}
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+            <DragOverlay>
+              {activeDragApp ? (
+                <DragOverlayCard app={activeDragApp} />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
     </div>

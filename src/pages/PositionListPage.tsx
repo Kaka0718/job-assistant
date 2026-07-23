@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Briefcase, Archive, Trash2 } from "lucide-react";
+import { Plus, Search, Briefcase, Archive, Trash2, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import Header from "@/components/layout/Header";
 import { usePositionStore } from "@/stores/positionStore";
 import { toast } from "sonner";
+import { invoke } from "@tauri-apps/api/core";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import type { PositionCategory } from "@/types/position";
 
 const CATEGORIES: PositionCategory[] = [
@@ -32,7 +34,9 @@ export default function PositionListPage() {
   const [statusFilter, setStatusFilter] = useState("全部");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
-  const { positions, loading, fetchPositions, deletePosition, archivePosition } = usePositionStore();
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState("");
+  const { positions, loading, fetchPositions, deletePosition, archivePosition, createPosition } = usePositionStore();
 
   useEffect(() => {
     fetchPositions();
@@ -81,16 +85,140 @@ export default function PositionListPage() {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: "JSON", extensions: ["json"] }],
+        defaultPath: "positions.json",
+      });
+      if (!filePath) return;
+
+      const exportData = positions.map((p) => ({
+        title: p.title,
+        category: p.category,
+        skills: p.skills,
+        tags: p.tags,
+        notes: p.notes || "",
+        analysis: p.analysis || "",
+        interviewQuestions: p.interviewQuestions || "",
+      }));
+
+      const json = JSON.stringify(exportData, null, 2);
+      await invoke("write_text_file", { path: filePath, content: json });
+      toast.success(`已导出 ${exportData.length} 个岗位档案`);
+    } catch (err) {
+      toast.error(`导出失败：${err}`);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const filePath = await open({
+        filters: [{ name: "JSON", extensions: ["json"] }],
+        multiple: false,
+      });
+      if (!filePath) return;
+
+      setImporting(true);
+      setImportProgress("正在读取文件...");
+      const content = await invoke<string>("read_text_file", { path: filePath });
+
+      let data: unknown;
+      try {
+        data = JSON.parse(content);
+      } catch {
+        toast.error("文件格式错误：不是有效的 JSON 文件");
+        setImporting(false);
+        return;
+      }
+
+      if (!Array.isArray(data)) {
+        toast.error("文件格式错误：JSON 根节点应为数组");
+        setImporting(false);
+        return;
+      }
+
+      let success = 0;
+      let skipped = 0;
+      for (let i = 0; i < data.length; i++) {
+        const item = data[i] as Record<string, unknown>;
+        setImportProgress(`正在导入第 ${i + 1}/${data.length} 条...`);
+
+        if (!item.title || !item.category) {
+          skipped++;
+          continue;
+        }
+
+        const validCategories = ["测试", "开发", "运营", "产品", "设计", "运维", "数据", "其他"];
+        const category = String(item.category);
+        if (!validCategories.includes(category)) {
+          skipped++;
+          continue;
+        }
+
+        // Check for duplicate title
+        if (positions.some((p) => p.title === item.title)) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          await createPosition({
+            title: String(item.title),
+            category: category as PositionCategory,
+            skills: Array.isArray(item.skills) ? item.skills.map(String) : [],
+            tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
+            notes: item.notes ? String(item.notes) : undefined,
+            analysis: item.analysis ? String(item.analysis) : undefined,
+            interviewQuestions: item.interviewQuestions
+              ? String(item.interviewQuestions)
+              : undefined,
+          });
+          success++;
+        } catch {
+          skipped++;
+        }
+      }
+
+      await fetchPositions();
+      toast.success(`导入完成：成功 ${success} 条，跳过 ${skipped} 条`);
+    } catch (err) {
+      toast.error(`导入失败：${err}`);
+    } finally {
+      setImporting(false);
+      setImportProgress("");
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <Header
         title="岗位档案"
         description="管理你的求职岗位方向"
         actions={
-          <Button onClick={() => navigate("/positions/new")}>
-            <Plus size={16} className="mr-1" />
-            新建档案
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={positions.length === 0}>
+              <Download size={16} className="mr-1" />
+              导出
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleImport} disabled={importing}>
+              {importing ? (
+                <>
+                  <span className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  {importProgress || "导入中..."}
+                </>
+              ) : (
+                <>
+                  <Upload size={16} className="mr-1" />
+                  导入
+                </>
+              )}
+            </Button>
+            <Button onClick={() => navigate("/positions/new")}>
+              <Plus size={16} className="mr-1" />
+              新建档案
+            </Button>
+          </div>
         }
       />
 
