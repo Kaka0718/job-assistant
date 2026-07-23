@@ -1,13 +1,38 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Send } from "lucide-react";
+import { Search, Send, LayoutList, Columns3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EmptyState } from "@/components/common/EmptyState";
 import Header from "@/components/layout/Header";
 import { useApplicationStore } from "@/stores/applicationStore";
+import { toast } from "sonner";
+import { formatDate } from "@/lib/date";
+import type { ApplicationStatus } from "@/types/application";
+
+const PAGE_SIZE = 20;
+
+const STATUS_ORDER: ApplicationStatus[] = [
+  "draft",
+  "applied",
+  "read",
+  "chatting",
+  "interview",
+  "offer",
+  "rejected",
+  "archived",
+];
 
 const statusColorMap: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
@@ -31,76 +56,350 @@ const statusLabelMap: Record<string, string> = {
   archived: "已归档",
 };
 
+const kanbanColumnColors: Record<string, string> = {
+  draft: "border-t-slate-400",
+  applied: "border-t-blue-500",
+  read: "border-t-sky-500",
+  chatting: "border-t-violet-500",
+  interview: "border-t-amber-500",
+  offer: "border-t-emerald-500",
+  rejected: "border-t-red-500",
+  archived: "border-t-slate-300",
+};
+
 export default function ApplicationListPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const { applications, loading, fetchApplications } = useApplicationStore();
+  const [statusFilter, setStatusFilter] = useState("全部");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+  const { applications, loading, fetchApplications, updateStatus } = useApplicationStore();
 
   useEffect(() => {
     fetchApplications();
   }, [fetchApplications]);
 
-  return (
-    <div className="flex h-full flex-col">
-      <Header title="投递记录" description="追踪你的投递进展" />
+  // Reset display count when filters change
+  useEffect(() => {
+    setDisplayCount(PAGE_SIZE);
+  }, [search, statusFilter]);
 
-      <div className="flex-1 space-y-4 overflow-auto p-6">
-        {/* Search */}
-        <div className="relative w-full max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-          <Input
-            placeholder="搜索公司或岗位..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+  const filteredApplications = applications.filter((app) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (
+        !app.company.toLowerCase().includes(q) &&
+        !app.positionTitle.toLowerCase().includes(q)
+      ) {
+        return false;
+      }
+    }
+    if (statusFilter !== "全部" && app.status !== statusFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  const displayedApplications = filteredApplications.slice(0, displayCount);
+  const hasMore = displayCount < filteredApplications.length;
+
+  const handleStatusChange = async (id: string, newStatus: ApplicationStatus) => {
+    setStatusUpdating(id);
+    try {
+      await updateStatus(id, newStatus);
+      toast.success("状态已更新");
+    } catch (err) {
+      toast.error(`状态更新失败：${err}`);
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
+
+  // Kanban data
+  const kanbanColumns = STATUS_ORDER.map((status) => ({
+    status,
+    label: statusLabelMap[status],
+    apps: applications.filter(
+      (app) =>
+        app.status === status &&
+        (!search ||
+          app.company.toLowerCase().includes(search.toLowerCase()) ||
+          app.positionTitle.toLowerCase().includes(search.toLowerCase()))
+    ),
+  }));
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col">
+        <Header title="投递记录" description="追踪你的投递进展" />
+        <div className="flex-1 space-y-4 p-6">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 rounded-lg" />
+          ))}
         </div>
+      </div>
+    );
+  }
 
-        {/* Content */}
-        {loading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-lg" />
-            ))}
-          </div>
-        ) : applications.length === 0 ? (
+  // Empty state
+  if (applications.length === 0) {
+    return (
+      <div className="flex h-full flex-col">
+        <Header title="投递记录" description="追踪你的投递进展" />
+        <div className="flex flex-1 items-center justify-center p-6">
           <EmptyState
             icon={Send}
             title="还没有投递记录"
             description="生成打招呼后会自动记录投递，也可以手动添加"
+            actionLabel="去生成打招呼"
+            onAction={() => navigate("/greeting")}
           />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <Header
+        title="投递记录"
+        description="追踪你的投递进展"
+        actions={
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-0.5">
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => setViewMode("list")}
+            >
+              <LayoutList size={14} className="mr-1" />
+              列表
+            </Button>
+            <Button
+              variant={viewMode === "kanban" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => setViewMode("kanban")}
+            >
+              <Columns3 size={14} className="mr-1" />
+              看板
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="flex-1 space-y-4 overflow-auto p-6">
+        {/* Search & Filter */}
+        <div className="flex items-center gap-4">
+          <div className="relative w-full max-w-sm">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Input
+              placeholder="搜索公司或岗位..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        {viewMode === "list" ? (
+          <>
+            {/* Status Filter Tabs */}
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList className="h-auto flex-wrap">
+                <TabsTrigger value="全部">全部</TabsTrigger>
+                {STATUS_ORDER.map((status) => (
+                  <TabsTrigger key={status} value={status}>
+                    {statusLabelMap[status]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+
+            {/* List View */}
+            {displayedApplications.length === 0 ? (
+              <EmptyState
+                icon={Send}
+                title="没有找到投递记录"
+                description="尝试调整筛选条件"
+              />
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {displayedApplications.map((app) => (
+                    <Card
+                      key={app.id}
+                      className="cursor-pointer transition-colors hover:bg-surface-hover"
+                      onClick={() => navigate(`/applications/${app.id}`)}
+                    >
+                      <CardContent className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-text-primary">
+                              {app.company}
+                            </p>
+                            <p className="text-xs text-text-muted">
+                              {app.positionTitle} · {formatDate(app.created)}
+                            </p>
+                          </div>
+                          {app.matchScore != null && (
+                            <span className="text-xs text-text-muted">
+                              {app.matchScore}%
+                            </span>
+                          )}
+                        </div>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={app.status}
+                            onValueChange={(value: string) =>
+                              handleStatusChange(app.id, value as ApplicationStatus)
+                            }
+                            disabled={statusUpdating === app.id}
+                          >
+                            <SelectTrigger className="h-7 w-24 border-0 p-0 shadow-none">
+                              <SelectValue>
+                                <Badge
+                                  className={statusColorMap[app.status] || ""}
+                                >
+                                  {statusLabelMap[app.status] || app.status}
+                                </Badge>
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS_ORDER.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  <span className={statusColorMap[s]}>
+                                    {statusLabelMap[s]}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Load More */}
+                {hasMore && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setDisplayCount((prev) => prev + PAGE_SIZE)
+                      }
+                    >
+                      加载更多（{filteredApplications.length - displayCount} 条）
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         ) : (
-          <div className="space-y-3">
-            {applications
-              .filter(
-                (app) =>
-                  !search ||
-                  app.company.toLowerCase().includes(search.toLowerCase()) ||
-                  app.positionTitle.toLowerCase().includes(search.toLowerCase()),
-              )
-              .map((app) => (
-                <Card
-                  key={app.id}
-                  className="cursor-pointer transition-colors hover:bg-surface-hover"
-                  onClick={() => navigate(`/applications/${app.id}`)}
+          /* Kanban View */
+          <div className="flex h-full gap-4 overflow-x-auto pb-4">
+            {kanbanColumns.map((col) => (
+              <div
+                key={col.status}
+                className={`flex min-w-56 flex-col rounded-lg border border-border bg-surface ${
+                  col.apps.length === 0 ? "opacity-50" : ""
+                }`}
+              >
+                {/* Column Header */}
+                <div
+                  className={`flex items-center justify-between border-b border-border px-3 py-2.5 ${
+                    kanbanColumnColors[col.status]
+                  } border-t-2`}
                 >
-                  <CardContent className="flex items-center justify-between p-4">
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">{app.company}</p>
-                      <p className="text-xs text-text-muted">
-                        {app.positionTitle} · {app.created}
-                      </p>
+                  <span className="text-sm font-medium text-text-primary">
+                    {col.label}
+                  </span>
+                  <span className="rounded-full bg-surface-hover px-2 py-0.5 text-xs text-text-muted">
+                    {col.apps.length}
+                  </span>
+                </div>
+
+                {/* Column Cards */}
+                <div className="flex-1 space-y-2 overflow-y-auto p-2">
+                  {col.apps.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <p className="text-xs text-text-muted">暂无记录</p>
                     </div>
-                    <Badge className={statusColorMap[app.status] || ""}>
-                      {statusLabelMap[app.status] || app.status}
-                    </Badge>
-                  </CardContent>
-                </Card>
-              ))}
+                  ) : (
+                    col.apps.map((app) => (
+                      <Card
+                        key={app.id}
+                        className="cursor-pointer transition-colors hover:bg-surface-hover"
+                        onClick={() => navigate(`/applications/${app.id}`)}
+                      >
+                        <CardContent className="p-3">
+                          <p className="truncate text-sm font-medium text-text-primary">
+                            {app.company}
+                          </p>
+                          <p className="truncate text-xs text-text-muted">
+                            {app.positionTitle}
+                          </p>
+                          <div className="mt-2 flex items-center justify-between">
+                            <span className="text-xs text-text-muted">
+                              {formatDate(app.created)}
+                            </span>
+                            {app.matchScore != null && (
+                              <span className="text-xs text-text-muted">
+                                {app.matchScore}%
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className="mt-1.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Select
+                              value={app.status}
+                              onValueChange={(value: string) =>
+                                handleStatusChange(
+                                  app.id,
+                                  value as ApplicationStatus
+                                )
+                              }
+                              disabled={statusUpdating === app.id}
+                            >
+                              <SelectTrigger className="h-6 w-full border-0 p-0 shadow-none">
+                                <SelectValue>
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-xs ${
+                                      statusColorMap[app.status] || ""
+                                    }`}
+                                  >
+                                    {statusLabelMap[app.status] || app.status}
+                                  </span>
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STATUS_ORDER.map((s) => (
+                                  <SelectItem key={s} value={s}>
+                                    <span className={statusColorMap[s]}>
+                                      {statusLabelMap[s]}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
     </div>
   );
 }
-
