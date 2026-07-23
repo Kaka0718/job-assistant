@@ -268,8 +268,15 @@ mod tests {
         let lines = read_csv_lines(&csv_path);
         assert!(lines.len() >= 2, "应有表头 + 至少 1 行数据");
         assert_eq!(lines[0], "title,category,status,skills,tags,notes,analysis,createdAt,updatedAt");
-        assert!(lines[1].contains("测试工程师"));
-        assert!(lines[1].contains("功能测试; 自动化测试"));
+        // 不固定行号：list_positions 返回全量数据，刚创建的记录未必在第一行
+        assert!(
+            lines.iter().any(|l| l.contains("测试工程师")),
+            "导出文件应包含新创建的岗位"
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("功能测试; 自动化测试")),
+            "导出文件应包含 skills 拼接"
+        );
 
         // 清理
         storage::position_storage::delete_position(&pos.id).unwrap();
@@ -305,8 +312,15 @@ mod tests {
             lines[0],
             "positionTitle,company,status,matchScore,createdAt,hasProgress,keywords,jdContent"
         );
-        assert!(lines[1].contains("测试工程师"));
-        assert!(lines[1].contains("字节跳动"));
+        // 不固定行号：list_applications 返回全量数据，刚创建的记录未必在第一行
+        assert!(
+            lines.iter().any(|l| l.contains("测试工程师")),
+            "导出文件应包含新创建的投递记录"
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("字节跳动")),
+            "导出文件应包含公司名"
+        );
 
         // 清理
         storage::application_storage::delete_application(&app.id).unwrap();
