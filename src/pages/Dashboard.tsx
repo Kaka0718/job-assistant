@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ArrowRight,
   BarChart3,
+  Download,
 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { useApplicationStore } from "@/stores/applicationStore";
@@ -34,6 +35,9 @@ import {
   Legend,
 } from "recharts";
 import type { PieLabelRenderProps } from "recharts";
+import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 
 const statusColorMap: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
@@ -187,6 +191,26 @@ export default function Dashboard() {
   }));
   const hasStatusData = statusData.some((d) => d.value > 0);
 
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportDashboard = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+        defaultPath: `dashboard-report-${format(new Date(), "yyyy-MM-dd")}.csv`,
+      });
+      if (!filePath) return;
+
+      setExporting(true);
+      await invoke("export_dashboard_csv", { path: filePath });
+      toast.success("报告已导出");
+    } catch (err) {
+      toast.error(`导出失败：${err}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const stats = [
     {
       label: "今日投递",
@@ -261,7 +285,21 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-full flex-col">
-      <Header title="仪表盘" description="求职概览" />
+      <Header
+        title="仪表盘"
+        description="求职概览"
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportDashboard}
+            disabled={exporting}
+          >
+            <Download size={14} className="mr-1" />
+            {exporting ? "导出中..." : "导出报告"}
+          </Button>
+        }
+      />
 
       <div className="flex-1 space-y-6 overflow-auto p-6">
         {/* Stats Cards */}

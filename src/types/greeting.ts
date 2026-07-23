@@ -10,3 +10,14 @@ export interface GreetingAnalysis {
   suggestions: string[];
   keyRequirements: string[];
 }
+
+export interface GreetingVersion {
+  id: string;
+  positionId: string;
+  positionTitle: string;
+  company: string;
+  jdContent: string;
+  selectedKeywords?: string[];
+  result: GreetingResult;
+  createdAt: string; // ISO 8601
+}
