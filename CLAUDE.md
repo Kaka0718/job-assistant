@@ -78,3 +78,8 @@ AI API (fetch from frontend) ← result ← GreetingStore ← parseGreetingResul
 - `file_ops.rs` tests use temp directories.
 - `frontmatter.rs` tests roundtrip parse/serialize.
 - `error.rs` tests error display and type conversions.
+## Engineering Principles
+
+Always follow the coding guidelines in `.claude/skills/claude-code-eight-principles/SKILL.md`:
+verify before assuming, align before building, reuse existing code, cover edge cases,
+follow conventions, admit uncertainty, and iterate incrementally.
