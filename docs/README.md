@@ -13,29 +13,37 @@ docs/
 │   ├── MODULE_B_前端开发.md
 │   ├── MODULE_B_后端开发.md
 │   ├── MODULE_C_前端开发.md
-│   └── MODULE_C_后端开发.md
+│   ├── MODULE_C_后端开发.md
+│   ├── MODULE_D_前端开发.md
+│   ├── MODULE_D_后端开发.md
+│   └── MODULE_D_测试说明.md
 │
 ├── sprint-tasks/                   ← 📋 开发任务文档（PM 输出）
 │   ├── MODULE_A_基础设施搭建.md
 │   ├── MODULE_B_AI打招呼生成.md
-│   └── MODULE_C_岗位管理_投递看板.md
+│   ├── MODULE_C_岗位管理_投递看板.md
+│   └── MODULE_D_体验优化.md
 │
 ├── delivery-reports/               ← 📦 开发交付报告（Dev Agent 输出）
 │   ├── MODULE_A_前端交付报告.md
 │   ├── MODULE_A_后端交付报告.md
 │   ├── MODULE_B_前端交付报告.md
-│   └── MODULE_B_后端交付报告.md
+│   ├── MODULE_B_后端交付报告.md
+│   └── MODULE_C_后端交付报告.md
 │
 ├── test-reports/                   ← 🧪 QA 测试报告（QA Agent 输出）
 │   ├── MODULE_A_基础设施搭建.md
 │   ├── QA_TEST_REPORT_MODULE_B.md
+│   ├── QA_TEST_REPORT_SPRINT3.md
 │   └── PM_SPRINT2_ACCEPTANCE.md
 │
 └── pm-reports/                     ← ✅ PM 验收报告（PM Agent 输出）
     ├── MODULE_A_基础设施搭建.md
     ├── MODULE_A_QA质量门禁报告.md
     ├── MODULE_B_AI打招呼生成.md
-    └── PM_SPRINT2_ACCEPTANCE.md
+    ├── MODULE_C_岗位管理_投递看板.md
+    ├── PM_SPRINT2_ACCEPTANCE.md
+    └── PM_SPRINT3_ACCEPTANCE.md
 ```
 
 ---
@@ -62,6 +70,9 @@ MODULE_{模块字母}_{功能描述}.md
 | `MODULE_B_后端开发.md` | `agent-prompts/` | Sprint 2: 后端开发 Agent 任务指令 |
 | `MODULE_C_岗位管理_投递看板.md` | `sprint-tasks/` | Sprint 3: 岗位管理 + 投递看板 |
 | `MODULE_C_前端开发.md` | `agent-prompts/` | Sprint 3: 前端开发 Agent 任务指令 |
+| `MODULE_D_体验优化.md` | `sprint-tasks/` | Sprint 4: 拖拽排序 + 图表 + 导入导出 + 备份恢复 |
+| `MODULE_D_前端开发.md` | `agent-prompts/` | Sprint 4: 前端开发 Agent 任务指令 |
+| `MODULE_D_后端开发.md` | `agent-prompts/` | Sprint 4: 后端开发 Agent 任务指令 |
 
 ---
 
@@ -69,9 +80,9 @@ MODULE_{模块字母}_{功能描述}.md
 
 | 你是什么角色？ | 读哪个目录？ | 说明 |
 |:--------------|:------------|:-----|
-| 🤖 **前端 Dev Agent** | `docs/agent-prompts/MODULE_C_前端开发.md` | 明确你的开发范围和输出规范 |
-| 🤖 **后端 Dev Agent** | `docs/agent-prompts/MODULE_C_后端开发.md` | 明确你的开发范围和输出规范 |
-| 🧪 **QA Agent** | `docs/sprint-tasks/` 对应模块 + 输出到 `docs/test-reports/` | 先读任务文档了解需求，再出测试报告 |
+| 🤖 **前端 Dev Agent** | `docs/agent-prompts/MODULE_D_前端开发.md` | 明确你的开发范围和输出规范 |
+| 🤖 **后端 Dev Agent** | `docs/agent-prompts/MODULE_D_后端开发.md` | 明确你的开发范围和输出规范 |
+| 🧪 **QA Agent** | `docs/agent-prompts/MODULE_D_测试说明.md` | 明确测试范围，输出到 `docs/test-reports/` |
 | ✅ **PM Agent** | `docs/sprint-tasks/` 对应模块 + 输出到 `docs/pm-reports/` | 先读任务文档对照需求，再出验收报告 |
 
 ---
