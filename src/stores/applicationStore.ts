@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
 import type {
   Application,
   ApplicationFilter,
@@ -7,6 +6,7 @@ import type {
   CreateApplicationInput,
   UpdateApplicationInput,
 } from "@/types/application";
+import { api } from "@/lib/tauri";
 
 interface ApplicationStore {
   applications: Application[];
@@ -31,7 +31,7 @@ export const useApplicationStore = create<ApplicationStore>((set) => ({
   fetchApplications: async (filter?: ApplicationFilter) => {
     set({ loading: true, error: null });
     try {
-      const applications = await invoke<Application[]>("list_applications", { filter: filter || {} });
+      const applications = await api.listApplications(filter);
       set({ applications, loading: false, filter: filter || {} });
     } catch (err) {
       set({ error: String(err), loading: false });
@@ -44,7 +44,7 @@ export const useApplicationStore = create<ApplicationStore>((set) => ({
 
   createApplication: async (data: CreateApplicationInput) => {
     try {
-      const application = await invoke<Application>("create_application", { data });
+      const application = await api.createApplication(data);
       set((state) => ({ applications: [application, ...state.applications] }));
       return application;
     } catch (err) {
@@ -55,7 +55,7 @@ export const useApplicationStore = create<ApplicationStore>((set) => ({
 
   updateApplication: async (id: string, data: UpdateApplicationInput) => {
     try {
-      const application = await invoke<Application>("update_application", { id, data });
+      const application = await api.updateApplication(id, data);
       set((state) => ({
         applications: state.applications.map((a) => (a.id === id ? application : a)),
       }));
@@ -68,7 +68,7 @@ export const useApplicationStore = create<ApplicationStore>((set) => ({
 
   updateStatus: async (id: string, status: ApplicationStatus) => {
     try {
-      const application = await invoke<Application>("update_application_status", { id, status });
+      const application = await api.updateApplicationStatus(id, status);
       set((state) => ({
         applications: state.applications.map((a) => (a.id === id ? application : a)),
       }));
@@ -80,7 +80,7 @@ export const useApplicationStore = create<ApplicationStore>((set) => ({
 
   deleteApplication: async (id: string) => {
     try {
-      await invoke<void>("delete_application", { id });
+      await api.deleteApplication(id);
       set((state) => ({
         applications: state.applications.filter((a) => a.id !== id),
       }));

@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
 import type { Profile } from "@/types/profile";
+import { api } from "@/lib/tauri";
 
 interface ProfileStore {
   profile: Profile | null;
@@ -21,7 +21,7 @@ export const useProfileStore = create<ProfileStore>((set) => ({
   fetchProfile: async () => {
     set({ loading: true, error: null });
     try {
-      const profile = await invoke<Profile | null>("get_profile");
+      const profile = await api.getProfile();
       set({ profile, loading: false });
     } catch (err) {
       set({ error: String(err), loading: false });
@@ -31,7 +31,7 @@ export const useProfileStore = create<ProfileStore>((set) => ({
   saveProfile: async (data: Profile) => {
     set({ saving: true, error: null });
     try {
-      const profile = await invoke<Profile>("save_profile", { data });
+      const profile = await api.saveProfile(data);
       set({ profile, saving: false });
     } catch (err) {
       set({ error: String(err), saving: false });

@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
 import type { Position, CreatePositionInput, UpdatePositionInput } from "@/types/position";
+import { api } from "@/lib/tauri";
 
 interface PositionStore {
   positions: Position[];
@@ -23,7 +23,7 @@ export const usePositionStore = create<PositionStore>((set, get) => ({
   fetchPositions: async () => {
     set({ loading: true, error: null });
     try {
-      const positions = await invoke<Position[]>("list_positions");
+      const positions = await api.listPositions();
       set({ positions, loading: false });
     } catch (err) {
       set({ error: String(err), loading: false });
@@ -36,7 +36,7 @@ export const usePositionStore = create<PositionStore>((set, get) => ({
 
   createPosition: async (data: CreatePositionInput) => {
     try {
-      const position = await invoke<Position>("create_position", { data });
+      const position = await api.createPosition(data);
       set((state) => ({ positions: [...state.positions, position] }));
       return position;
     } catch (err) {
@@ -47,7 +47,7 @@ export const usePositionStore = create<PositionStore>((set, get) => ({
 
   updatePosition: async (id: string, data: UpdatePositionInput) => {
     try {
-      const position = await invoke<Position>("update_position", { id, data });
+      const position = await api.updatePosition(id, data);
       set((state) => ({
         positions: state.positions.map((p) => (p.id === id ? position : p)),
       }));
@@ -60,7 +60,7 @@ export const usePositionStore = create<PositionStore>((set, get) => ({
 
   deletePosition: async (id: string) => {
     try {
-      await invoke<void>("delete_position", { id });
+      await api.deletePosition(id);
       set((state) => ({
         positions: state.positions.filter((p) => p.id !== id),
       }));
@@ -72,7 +72,7 @@ export const usePositionStore = create<PositionStore>((set, get) => ({
 
   archivePosition: async (id: string) => {
     try {
-      const position = await invoke<Position>("archive_position", { id });
+      const position = await api.archivePosition(id);
       set((state) => ({
         positions: state.positions.map((p) => (p.id === id ? position : p)),
       }));

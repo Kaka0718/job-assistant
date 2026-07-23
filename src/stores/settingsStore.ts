@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
 import type { Settings } from "@/types/settings";
+import { api } from "@/lib/tauri";
 import { testConnection as testAIConnection } from "@/lib/ai";
 
 const defaultSettings: Settings = {
@@ -46,8 +46,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   fetchSettings: async () => {
     set({ loading: true, error: null });
     try {
-      const settings = await invoke<Settings>("get_settings");
-      set({ settings, loaded: true, loading: false });
+      const settings = await api.getSettings();
+      set({ settings: settings ?? defaultSettings, loaded: true, loading: false });
     } catch (err) {
       // Use defaults if settings can't be loaded
       set({ loaded: true, loading: false });
@@ -58,7 +58,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   saveSettings: async (data: Settings) => {
     set({ saving: true, error: null });
     try {
-      const settings = await invoke<Settings>("save_settings", { data });
+      const settings = await api.saveSettings(data);
       set({ settings, saving: false });
     } catch (err) {
       set({ error: String(err), saving: false });

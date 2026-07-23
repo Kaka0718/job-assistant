@@ -29,7 +29,18 @@
       "Bash(git -C .. status)",
       "Bash(git commit -m 'feat: 实现 Rust 后端完整骨架 *)",
       "Bash(git commit *)",
-      "Bash(git commit -m 'feat: 完成 B1 存储层补全 - 修复 QA 缺陷 001-004，实现完整 CRUD + Commands *)"
+      "Bash(git commit -m 'feat: 完成 B1 存储层补全 - 修复 QA 缺陷 001-004，实现完整 CRUD + Commands *)",
+      "Bash(npm -v)",
+      "Bash(echo \"npm: $\\(npm -v\\)\")",
+      "Bash(rustc -V)",
+      "Bash(echo \"rustc: $\\(rustc -V\\)\")",
+      "Bash(cargo -V)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist //FI \"PID eq 20600\" //FO CSV //NH)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)"
     ]
   }
 }
