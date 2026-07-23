@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Send, LayoutList, Columns3 } from "lucide-react";
+import { Search, Send, LayoutList, Columns3, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,8 @@ import { EmptyState } from "@/components/common/EmptyState";
 import Header from "@/components/layout/Header";
 import { useApplicationStore } from "@/stores/applicationStore";
 import { toast } from "sonner";
+import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 import { formatDate } from "@/lib/date";
 import type { ApplicationStatus } from "@/types/application";
 import type { Application } from "@/types/application";
@@ -214,6 +216,25 @@ export default function ApplicationListPage() {
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
   const [activeDragApp, setActiveDragApp] = useState<Application | null>(null);
   const { applications, loading, fetchApplications, updateStatus } = useApplicationStore();
+  const [csvExporting, setCsvExporting] = useState(false);
+
+  const handleExportCsv = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+        defaultPath: "applications.csv",
+      });
+      if (!filePath) return;
+
+      setCsvExporting(true);
+      await invoke("export_applications_csv", { path: filePath });
+      toast.success("投递记录 CSV 已导出");
+    } catch (err) {
+      toast.error(`导出失败：${err}`);
+    } finally {
+      setCsvExporting(false);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -373,6 +394,17 @@ export default function ApplicationListPage() {
             >
               <Columns3 size={14} className="mr-1" />
               看板
+            </Button>
+            <div className="mx-1 h-4 w-px bg-border" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2"
+              onClick={handleExportCsv}
+              disabled={csvExporting || applications.length === 0}
+            >
+              <Download size={14} className="mr-1" />
+              {csvExporting ? "导出中..." : "导出 CSV"}
             </Button>
           </div>
         }

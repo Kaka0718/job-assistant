@@ -5,10 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import Header from "@/components/layout/Header";
 import JDPasteInput from "@/components/greeting/JDPasteInput";
+import KeywordSelector from "@/components/greeting/KeywordSelector";
 import PositionSelector from "@/components/position/PositionSelector";
 import GenerationProgress from "@/components/greeting/GenerationProgress";
 import GreetingResult from "@/components/greeting/GreetingResult";
+import VersionHistory from "@/components/greeting/VersionHistory";
 import { useGreetingStore } from "@/stores/greetingStore";
+import { useGreetingVersionStore } from "@/stores/greetingVersionStore";
 import { useProfileStore } from "@/stores/profileStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { Sparkles, Settings, User } from "lucide-react";
@@ -20,15 +23,26 @@ export default function GreetingPage() {
     selectedPositionId,
     result,
     generating,
+    isStreaming,
+    streamingContent,
+    keywords,
+    selectedKeywords,
     error,
     progress,
     setJdContent,
     setSelectedPosition,
+    setSelectedKeywords,
     generateGreeting,
   } = useGreetingStore();
 
   const { profile, fetchProfile } = useProfileStore();
   const { settings, fetchSettings } = useSettingsStore();
+  const {
+    versions,
+    currentVersionId,
+    switchVersion,
+    deleteVersion,
+  } = useGreetingVersionStore();
 
   // Load data on mount
   useEffect(() => {
@@ -132,6 +146,13 @@ export default function GreetingPage() {
                   disabled={generating}
                 />
 
+                <KeywordSelector
+                  keywords={keywords}
+                  selectedKeywords={selectedKeywords}
+                  onSelect={setSelectedKeywords}
+                  disabled={generating}
+                />
+
                 <PositionSelector
                   value={selectedPositionId}
                   onChange={setSelectedPosition}
@@ -147,7 +168,7 @@ export default function GreetingPage() {
                   {generating ? (
                     <>
                       <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      {progress || "生成中..."}
+                      {isStreaming ? "正在生成..." : progress || "生成中..."}
                     </>
                   ) : (
                     <>
@@ -165,11 +186,13 @@ export default function GreetingPage() {
 
           {/* Right: Result */}
           <div className="space-y-4">
-            {result ? (
+            {result || isStreaming ? (
               <GreetingResult
-                result={result}
+                result={result ?? { greeting: "", analysis: { matchScore: 0, highlights: [], gaps: [], suggestions: [], keyRequirements: [] } }}
                 onRegenerate={handleRegenerate}
                 disabled={generating}
+                isStreaming={isStreaming}
+                streamingContent={streamingContent}
               />
             ) : (
               <Card>
@@ -188,6 +211,17 @@ export default function GreetingPage() {
             )}
           </div>
         </div>
+
+        {/* Version History */}
+        {selectedPositionId && (
+          <VersionHistory
+            versions={versions}
+            currentVersionId={currentVersionId}
+            onSelect={switchVersion}
+            onDelete={deleteVersion}
+            disabled={generating}
+          />
+        )}
       </div>
     </div>
   );

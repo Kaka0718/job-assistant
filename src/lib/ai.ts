@@ -49,6 +49,7 @@ function buildUserMessage(
   profile: Profile,
   position: Position,
   jdContent: string,
+  selectedKeywords?: string[],
 ): string {
   const sections: string[] = [];
 
@@ -93,6 +94,13 @@ function buildUserMessage(
   sections.push(
     "\n请确保打招呼中自然融入公司名称和 JD 中的 1-2 个具体岗位关键词。",
   );
+
+  // Add keyword constraints if user selected specific keywords
+  if (selectedKeywords && selectedKeywords.length > 0) {
+    sections.push(
+      `\n## 关键词约束\n用户已选择以下关键词，请在打招呼文案中优先围绕这些关键词展开：\n- ${selectedKeywords.join("\n- ")}`,
+    );
+  }
 
   return sections.join("\n\n");
 }
@@ -210,7 +218,117 @@ const TIMEOUT_MS = 30_000;
 // ──────────────────────────────────────────────
 
 /**
- * Generate a greeting message using the AI API.
+ * Generate a greeting message using the AI API with streaming output.
+ * Tokens are delivered via onToken callback as they arrive.
+ *
+ * @param params - Profile, Position, JD content, and Settings
+ * @param onToken - Callback for each incremental token
+ * @param signal - Optional AbortSignal for cancellation
+ * @throws Error with user-friendly message on failure
+ */
+export async function generateGreetingStream(
+  params: {
+    profile: Profile;
+    position: Position;
+    jdContent: string;
+    settings: Settings;
+    selectedKeywords?: string[];
+  },
+  onToken?: (token: string) => void,
+  signal?: AbortSignal,
+): Promise<GreetingResult> {
+  const { profile, position, jdContent, settings, selectedKeywords } = params;
+
+  // Validate API Key
+  if (!settings.ai.apiKey) {
+    throw new Error("API Key 未配置，请先前往设置页配置");
+  }
+
+  // Truncate JD if too long
+  const truncatedJD =
+    jdContent.length > MAX_JD_LENGTH
+      ? jdContent.slice(0, MAX_JD_LENGTH) +
+        "\n\n[注意：JD 内容过长，已自动截断]"
+      : jdContent;
+
+  const userMessage = buildUserMessage(profile, position, truncatedJD, selectedKeywords);
+
+  const baseUrl = settings.ai.baseUrl.replace(/\/+$/, "");
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${settings.ai.apiKey}`,
+    },
+    body: JSON.stringify({
+      ...buildRequestBody(settings, SYSTEM_PROMPT, userMessage),
+      stream: true,
+    }),
+    signal,
+  });
+
+  if (response.status === 401) {
+    throw new Error("API Key 无效，请检查设置");
+  }
+  if (response.status === 402 || response.status === 429) {
+    throw new Error("API 余额不足，请充值");
+  }
+  if (!response.ok) {
+    throw new Error(`API 请求失败 (${response.status})`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("无法读取响应流");
+  }
+
+  const decoder = new TextDecoder();
+  let fullContent = "";
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE format: data: {"choices":[{"delta":{"content":"xxx"}}]}\n\n
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data: ")) continue;
+
+        const data = trimmed.slice(6);
+        if (data === "[DONE]") continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullContent += delta;
+            onToken?.(delta);
+          }
+        } catch {
+          // Skip malformed JSON lines
+          continue;
+        }
+      }
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("生成超时，请重试");
+    }
+    throw err;
+  }
+
+  return parseGreetingResult(fullContent);
+}
+
+/**
+ * Generate a greeting message using the AI API (non-streaming, legacy fallback).
  * Calls the AI directly from the frontend (OpenAI-compatible format).
  *
  * @param params - Profile, Position, JD content, and Settings
@@ -223,6 +341,7 @@ export async function generateGreeting(
     position: Position;
     jdContent: string;
     settings: Settings;
+    selectedKeywords?: string[];
   },
   onProgress?: (stage: string) => void,
 ): Promise<GreetingResult> {
@@ -242,7 +361,7 @@ export async function generateGreeting(
         "\n\n[注意：JD 内容过长，已自动截断]"
       : jdContent;
 
-  const userMessage = buildUserMessage(profile, position, truncatedJD);
+  const userMessage = buildUserMessage(profile, position, truncatedJD, params.selectedKeywords);
 
   onProgress?.("正在生成打招呼...");
 

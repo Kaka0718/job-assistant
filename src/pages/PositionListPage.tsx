@@ -111,6 +111,26 @@ export default function PositionListPage() {
     }
   };
 
+  const [csvExporting, setCsvExporting] = useState(false);
+
+  const handleExportCsv = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+        defaultPath: "positions.csv",
+      });
+      if (!filePath) return;
+
+      setCsvExporting(true);
+      await invoke("export_positions_csv", { path: filePath });
+      toast.success("岗位档案 CSV 已导出");
+    } catch (err) {
+      toast.error(`导出失败：${err}`);
+    } finally {
+      setCsvExporting(false);
+    }
+  };
+
   const handleImport = async () => {
     try {
       const filePath = await open({
@@ -213,6 +233,10 @@ export default function PositionListPage() {
                   导入
                 </>
               )}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={csvExporting || positions.length === 0}>
+              <Download size={16} className="mr-1" />
+              {csvExporting ? "导出中..." : "导出 CSV"}
             </Button>
             <Button onClick={() => navigate("/positions/new")}>
               <Plus size={16} className="mr-1" />
